@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hispaniola Monitor — Haiti & DR Intelligence Dashboard</title>
+  <meta name="description" content="Real-time intelligence dashboard for Haiti and the Dominican Republic. AI-synthesized news, gang activity tracking, economic signals, and live feeds." />
+  <meta property="og:title" content="Hispaniola Monitor" />
+  <meta property="og:description" content="Haiti & DR Intelligence Dashboard" />
+  
+  <!-- Globe.gl -->
+  <script src="https://unpkg.com/globe.gl@2.31.4/dist/globe.gl.min.js"></script>
+  <!-- Deck.gl -->
+  <script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js"></script>
+  <!-- MapLibre for flat map base -->
+  <script src="https://unpkg.com/maplibre-gl@4.1.3/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@4.1.3/dist/maplibre-gl.css" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #080f1a;
+      --bg2: #0d1829;
+      --bg3: #111f33;
+      --border: #1e3a5f;
+      --text: #c8d8f0;
+      --text2: #7a9fc0;
+      --text3: #3d6080;
+      --accent: #00aaff;
+      --ht: #0044cc;
+      --do: #cc0000;
+      --critical: #ff2222;
+      --high: #ff6600;
+      --medium: #ffaa00;
+      --low: #22cc66;
+      --font: 'Courier New', 'Lucida Console', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12px;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    #header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+    #header .logo {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      white-space: nowrap;
+    }
+    #header .flags { font-size: 18px; }
+    #header .tagline { color: var(--text2); font-size: 10px; letter-spacing: 1px; }
+    #header .status-pills { display: flex; gap: 8px; margin-left: auto; align-items: center; }
+    .pill {
+      font-size: 9px;
+      letter-spacing: 1px;
+      padding: 2px 8px;
+      border-radius: 2px;
+      border: 1px solid;
+    }
+    .pill.live { border-color: var(--critical); color: var(--critical); animation: blink 2s infinite; }
+    .pill.ht { border-color: var(--ht); color: #4488ff; }
+    .pill.do { border-color: var(--do); color: #ff6666; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* ── LAYOUT ── */
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── LEFT PANEL ── */
+    #left-panel {
+      width: 320px;
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── MAP CENTER ── */
+    #map-center {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── RIGHT PANEL ── */
+    #right-panel {
+      width: 300px;
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .tab {
+      flex: 1;
+      padding: 7px 4px;
+      text-align: center;
+      font-size: 9px;
+      letter-spacing: 1px;
+      color: var(--text3);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── PANEL SECTIONS ── */
+    .panel-section {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .panel-section::-webkit-scrollbar { width: 4px; }
+    .panel-section::-webkit-scrollbar-track { background: var(--bg); }
+    .panel-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      padding: 10px 12px 6px;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text3);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    /* ── EXECUTIVE SUMMARY ── */
+    #exec-summary {
+      padding: 12px;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #exec-summary .label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--critical);
+      margin-bottom: 6px;
+    }
+    #exec-summary .text {
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 11px;
+    }
+
+    /* ── CII METERS ── */
+    .cii-country {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .cii-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .cii-name { font-size: 11px; color: var(--text); }
+    .cii-score {
+      font-size: 22px;
+      font-weight: bold;
+    }
+    .cii-bar-wrap {
+      background: var(--bg);
+      height: 4px;
+      border-radius: 2px;
+      margin-bottom: 6px;
+    }
+    .cii-bar {
+      height: 4px;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+    .cii-signals {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .cii-signal {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9px;
+      color: var(--text2);
+    }
+    .signal-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── NEWS FEED ── */
+    .news-article {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .news-article:hover { background: var(--bg3); }
+    .news-cat {
+      font-size: 8px;
+      letter-spacing: 1px;
+      padding: 1px 5px;
+      border-radius: 1px;
+      margin-bottom: 4px;
+      display: inline-block;
+    }
+    .news-title {
+      color: var(--text);
+      font-size: 11px;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+    .news-meta {
+      color: var(--text3);
+      font-size: 9px;
+    }
+    .news-country-tag {
+      display: inline-block;
+      font-size: 8px;
+      padding: 1px 4px;
+      border-radius: 1px;
+      margin-right: 4px;
+    }
+
+    /* ── FINANCE ── */
+    .finance-rate {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .rate-label { color: var(--text2); font-size: 10px; }
+    .rate-value { font-size: 14px; color: var(--accent); }
+    .commodity-row {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .commodity-name { color: var(--text); font-size: 10px; }
+    .commodity-price { color: var(--text2); font-size: 10px; }
+    .change-pos { color: var(--low); }
+    .change-neg { color: var(--critical); }
+    
+    /* ── CRIMINALS ── */
+    .criminal-card {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .criminal-card:hover { background: var(--bg3); }
+    .criminal-rank { color: var(--text3); font-size: 9px; margin-bottom: 2px; }
+    .criminal-name { color: var(--text); font-size: 11px; margin-bottom: 2px; }
+    .criminal-org { color: var(--text2); font-size: 9px; margin-bottom: 4px; }
+    .criminal-desc { color: var(--text3); font-size: 9px; line-height: 1.4; }
+    .threat-badge {
+      display: inline-block;
+      font-size: 8px;
+      padding: 1px 5px;
+      border-radius: 1px;
+      letter-spacing: 1px;
+    }
+    .threat-critical { background: rgba(255,34,34,0.2); color: var(--critical); }
+    .threat-high { background: rgba(255,102,0,0.2); color: var(--high); }
+    .threat-medium { background: rgba(255,170,0,0.2); color: var(--medium); }
+
+    /* ── MAP CONTROLS ── */
+    #map-controls {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .map-btn {
+      background: rgba(8,15,26,0.85);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 5px 10px;
+      font-size: 9px;
+      font-family: var(--font);
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+    .map-btn:hover, .map-btn.active { color: var(--accent); border-color: var(--accent); }
+
+    /* ── MAP LEGEND ── */
+    #map-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(8,15,26,0.9);
+      border: 1px solid var(--border);
+      padding: 10px;
+      z-index: 20;
+      min-width: 180px;
+    }
+    .legend-title { font-size: 9px; letter-spacing: 2px; color: var(--text3); margin-bottom: 8px; text-transform: uppercase; }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 9px;
+      color: var(--text2);
+      margin-bottom: 4px;
+    }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .legend-check {
+      width: 10px;
+      height: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .legend-check.checked { background: var(--accent); border-color: var(--accent); }
+    .legend-check.checked-red { background: var(--critical); border-color: var(--critical); }
+
+    /* ── STREAMS ── */
+    .stream-card {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .stream-name { color: var(--text); font-size: 11px; margin-bottom: 4px; }
+    .stream-meta { color: var(--text3); font-size: 9px; margin-bottom: 8px; }
+    .stream-btn {
+      background: rgba(0,170,255,0.1);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 4px 10px;
+      font-family: var(--font);
+      font-size: 9px;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    .stream-embed { width: 100%; margin-top: 8px; border: 1px solid var(--border); }
+
+    /* ── SUBSCRIBE ── */
+    .subscribe-form {
+      padding: 16px 12px;
+    }
+    .subscribe-form p { color: var(--text2); line-height: 1.6; margin-bottom: 12px; font-size: 11px; }
+    .subscribe-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px;
+      font-family: var(--font);
+      font-size: 11px;
+      margin-bottom: 8px;
+      outline: none;
+    }
+    .subscribe-input:focus { border-color: var(--accent); }
+    .subscribe-btn {
+      width: 100%;
+      background: rgba(0,170,255,0.15);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 8px;
+      font-family: var(--font);
+      font-size: 11px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+    .subscribe-btn:hover { background: rgba(0,170,255,0.25); }
+    .subscribe-info { margin-top: 12px; color: var(--text3); font-size: 9px; line-height: 1.6; }
+
+    /* ── LOADING ── */
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .loading-logo { font-size: 24px; margin-bottom: 24px; }
+    .loading-text { color: var(--accent); font-size: 11px; letter-spacing: 3px; margin-bottom: 16px; }
+    .loading-bar-wrap { width: 200px; height: 2px; background: var(--border); border-radius: 1px; }
+    .loading-bar { height: 2px; background: var(--accent); border-radius: 1px; animation: load 2s ease-in-out infinite; }
+    @keyframes load { 0%{width:0} 50%{width:80%} 100%{width:100%} }
+
+    /* ── GLOBE ── */
+    #globe-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── FLAT MAP ── */
+    #flat-map-container {
+      width: 100%;
+      height: 100%;
+      display: none;
+    }
+    #flat-map-container.active { display: block; }
+    #globe-container.hidden { display: none; }
+
+    /* ── BRIEF CARDS ── */
+    .brief-card {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brief-cat {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text3);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .brief-text { color: var(--text); font-size: 10px; line-height: 1.5; }
+
+    /* ── MARKET COMPOSITE ── */
+    .market-bar-bg {
+      background: var(--bg);
+      height: 6px;
+      border-radius: 3px;
+      margin: 4px 0 8px;
+    }
+    .market-bar { height: 6px; border-radius: 3px; transition: width 0.5s; }
+
+    /* ── RESPONSIVE SCROLL CONTAINERS ── */
+    .hidden { display: none !important; }
+    
+    /* ── TIMESTAMP ── */
+    #timestamp {
+      color: var(--text3);
+      font-size: 9px;
+      padding: 4px 12px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="loading-logo">🇭🇹🇩🇴</div>
+  <div class="loading-text">HISPANIOLA MONITOR</div>
+  <div style="color:var(--text3);font-size:9px;letter-spacing:2px;margin-bottom:20px;">LOADING INTELLIGENCE FEED</div>
+  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+</div>
+
+<!-- Header -->
+<div id="header">
+  <span class="flags">🇭🇹🇩🇴</span>
+  <div>
+    <div class="logo">HISPANIOLA MONITOR</div>
+    <div class="tagline">HAITI · DOMINICAN REPUBLIC · REAL-TIME INTELLIGENCE</div>
+  </div>
+  <div class="status-pills">
+    <span class="pill live" id="live-badge">● LIVE</span>
+    <span class="pill ht">HAITI</span>
+    <span class="pill do">DR</span>
+    <span id="article-count" style="color:var(--text3);font-size:9px;"></span>
+    <span id="last-update" style="color:var(--text3);font-size:9px;"></span>
+  </div>
+</div>
+
+<!-- Main layout -->
+<div id="main">
+
+  <!-- Left Panel -->
+  <div id="left-panel">
+    <div id="exec-summary">
+      <div class="label">● EXECUTIVE BRIEF</div>
+      <div class="text" id="exec-text">Loading intelligence synthesis...</div>
+    </div>
+
+    <div class="tabs" id="left-tabs">
+      <div class="tab active" data-tab="news">NEWS</div>
+      <div class="tab" data-tab="briefs">BRIEFS</div>
+      <div class="tab" data-tab="streams">LIVE</div>
+      <div class="tab" data-tab="subscribe">ALERTS</div>
+    </div>
+
+    <!-- News Feed -->
+    <div class="panel-section" id="tab-news">
+      <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>LATEST INTELLIGENCE</span>
+        <span id="news-filter" style="cursor:pointer;color:var(--accent);">ALL ▾</span>
+      </div>
+      <div id="news-list"></div>
+    </div>
+
+    <!-- AI Briefs -->
+    <div class="panel-section hidden" id="tab-briefs">
+      <div class="section-header">AI CATEGORY BRIEFS</div>
+      <div id="briefs-list"></div>
+    </div>
+
+    <!-- Live Streams -->
+    <div class="panel-section hidden" id="tab-streams">
+      <div class="section-header">LIVE FEEDS</div>
+      <div id="streams-list"></div>
+    </div>
+
+    <!-- Subscribe -->
+    <div class="panel-section hidden" id="tab-subscribe">
+      <div class="section-header">WEEKLY ALERTS</div>
+      <div class="subscribe-form">
+        <p>Receive a synthesized intelligence brief every Friday at 8:00 AM EST. Covers security, politics, economy, and criminal activity in Haiti and the DR.</p>
+        <input type="email" class="subscribe-input" id="subscribe-email" placeholder="your@email.com" />
+        <button class="subscribe-btn" onclick="handleSubscribe()">SUBSCRIBE TO ALERTS</button>
+        <div class="subscribe-info">
+          📧 Weekly dispatch every Friday<br>
+          🔒 No tracking, no spam<br>
+          🚫 Unsubscribe anytime<br>
+          ⚡ Powered by Resend free tier
+        </div>
+        <div id="subscribe-status" style="margin-top:12px;font-size:10px;"></div>
+      </div>
+    </div>
+
+    <div id="timestamp"></div>
+  </div>
+
+  <!-- Map Center -->
+  <div id="map-center">
+    <div id="globe-container"></div>
+    <div id="flat-map-container"></div>
+    
+    <!-- Map controls -->
+    <div id="map-controls">
+      <button class="map-btn active" id="btn-globe" onclick="switchMap('globe')">◉ GLOBE</button>
+      <button class="map-btn" id="btn-flat" onclick="switchMap('flat')">▦ FLAT MAP</button>
+      <div style="height:8px;"></div>
+      <button class="map-btn" onclick="resetView()">⊕ RESET</button>
+      <button class="map-btn" onclick="flyToHaiti()">🇭🇹 HAITI</button>
+      <button class="map-btn" onclick="flyToDR()">🇩🇴 DR</button>
+      <button class="map-btn" onclick="flyToCaribbean()">🌊 CARIB</button>
+    </div>
+
+    <!-- Layer legend -->
+    <div id="map-legend">
+      <div class="legend-title">MAP LAYERS</div>
+      <label class="legend-item">
+        <div class="legend-check checked-red" id="layer-gangs" onclick="toggleLayer('gangs')"></div>
+        <div class="legend-dot" style="background:#ff2222;"></div>
+        Gang Territories (HT)
+      </label>
+      <label class="legend-item">
+        <div class="legend-check checked" id="layer-crisis" onclick="toggleLayer('crisis')"></div>
+        <div class="legend-dot" style="background:#ffaa00;"></div>
+        Crisis Points
+      </label>
+      <label class="legend-item">
+        <div class="legend-check checked" id="layer-border" onclick="toggleLayer('border')"></div>
+        <div class="legend-dot" style="background:#00aaff;"></div>
+        Border Crossings
+      </label>
+      <label class="legend-item">
+        <div class="legend-check checked" id="layer-infra" onclick="toggleLayer('infra')"></div>
+        <div class="legend-dot" style="background:#44ff88;"></div>
+        Infrastructure
+      </label>
+      <label class="legend-item">
+        <div class="legend-check" id="layer-quake" onclick="toggleLayer('quake')"></div>
+        <div class="legend-dot" style="background:#ff8800;"></div>
+        Earthquake Zone
+      </label>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <div id="right-panel">
+    <div class="tabs" id="right-tabs">
+      <div class="tab active" data-tab="cii">CII</div>
+      <div class="tab" data-tab="finance">FINANCE</div>
+      <div class="tab" data-tab="criminals">CRIMINALS</div>
+    </div>
+
+    <!-- CII Panel -->
+    <div class="panel-section" id="tab-cii">
+      <div class="section-header">COUNTRY INTELLIGENCE INDEX</div>
+      <div id="cii-container"></div>
+    </div>
+
+    <!-- Finance Panel -->
+    <div class="panel-section hidden" id="tab-finance">
+      <div class="section-header">FINANCE RADAR</div>
+      <div id="finance-container"></div>
+    </div>
+
+    <!-- Criminals Panel -->
+    <div class="panel-section hidden" id="tab-criminals">
+      <div class="section-header">CRIMINAL INTELLIGENCE</div>
+      <div id="criminals-container"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let FEED = null;
+let globe = null;
+let flatMap = null;
+let currentMapEngine = 'globe';
+let layers = { gangs: true, crisis: true, border: true, infra: true, quake: false };
+let newsFilter = 'all';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOAD FEED
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadFeed() {
+  try {
+    const base = window.location.pathname.replace(/\/[^/]*$/, '/');
+    const url = `${base}data/intelligence_feed.json?t=${Date.now()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    FEED = await res.json();
+    renderAll();
+    document.getElementById('loading-overlay').style.display = 'none';
+  } catch(e) {
+    // Show demo data if feed not yet generated
+    loadDemoData();
+  }
+}
+
+function loadDemoData() {
+  FEED = {
+    meta: { generated_at: new Date().toISOString(), total_articles: 0, total_feeds_scraped: 0 },
+    executive_summary: "Intelligence feed not yet generated. Run the GitHub Actions workflow to populate data. The CI/CD pipeline will scrape 435+ sources and generate this brief every 6 hours.",
+    category_briefs: {
+      security: "Awaiting pipeline run.",
+      politics: "Awaiting pipeline run.",
+      economy: "Awaiting pipeline run.",
+    },
+    articles: [],
+    cii: {
+      HT: { country: "HT", composite_score: 74.2, risk_level: "critical", trend: "deteriorating", signals: { gang_security: 87, political_stability: 71, economic_distress: 78, fuel_scarcity: 70, displacement_idp: 75, disease_health: 60, natural_disaster: 55, border_tension: 55, diaspora_remittance: 30, media_freedom: 55, international_presence: 35, social_unrest_velocity: 68 }, signal_article_counts: {}, computed_at: new Date().toISOString() },
+      DO: { country: "DO", composite_score: 28.5, risk_level: "low", trend: "stable", signals: { gang_security: 30, political_stability: 25, economic_distress: 28, fuel_scarcity: 20, displacement_idp: 15, disease_health: 20, natural_disaster: 35, border_tension: 45, diaspora_remittance: 20, media_freedom: 30, international_presence: 15, social_unrest_velocity: 25 }, signal_article_counts: {}, computed_at: new Date().toISOString() }
+    },
+    finance: {
+      exchange_rates: { USD_HTG: 132.5, USD_DOP: 59.3, source: "demo" },
+      commodities: [
+        { symbol: "CC=F", name: "Cocoa Futures", unit: "USD/ton", relevance: "DR export", price: 9840, change_pct: 1.2 },
+        { symbol: "KC=F", name: "Coffee Arabica", unit: "USD/lb", relevance: "Haiti/DR export", price: 3.42, change_pct: -0.8 },
+        { symbol: "SB=F", name: "Sugar Futures", unit: "USD/lb", relevance: "DR export", price: 0.198, change_pct: 0.4 },
+        { symbol: "CL=F", name: "Crude Oil WTI", unit: "USD/bbl", relevance: "Fuel costs", price: 78.4, change_pct: -1.1 },
+        { symbol: "BTC-USD", name: "Bitcoin", unit: "USD", relevance: "Remittance proxy", price: 67420, change_pct: 2.3 },
+      ],
+      companies: [],
+      market_composite: { composite_score: 62, signals: [], interpretation: "moderate" }
+    },
+    criminal_intelligence: {
+      haiti: {
+        total_tracked: 10, active: 8,
+        criminals: [
+          { rank:1, name:"Jimmy 'Barbecue' Chérizier", alias:"Barbecue", organization:"Viv Ansanm / G9", role:"Federation leader", status:"active", threat_level:"critical", territories:["Cité Soleil","Martissant"], coordinates:[18.5792,-72.3288], country:"HT", sanctions:["US Treasury OFAC SDN","UN SC"], description:"Commands the Viv Ansanm coalition controlling ~80% of Port-au-Prince metro.", sources:["insightcrime.org"] },
+          { rank:2, name:"Izo", alias:"Izo", organization:"5 Segonn / Viv Ansanm", role:"Gang leader Cité Soleil", status:"active", threat_level:"critical", territories:["Cité Soleil S.","Village de Dieu"], coordinates:[18.5680,-72.3378], country:"HT", sanctions:[], description:"Controls southern Cité Soleil. Part of Viv Ansanm coalition.", sources:["insightcrime.org"] },
+          { rank:3, name:"Ti Gabriel", alias:"Ti Gabriel", organization:"Gran Grif", role:"Gang leader NE Port-au-Prince", status:"active", threat_level:"critical", territories:["La Plaine","Croix-des-Bouquets"], coordinates:[18.5889,-72.2700], country:"HT", sanctions:[], description:"Controls northeast PaP including strategic DR border routes.", sources:["insightcrime.org"] },
+        ]
+      },
+      dominican_republic: {
+        total_tracked: 10, active: 7,
+        criminals: [
+          { rank:1, name:"Los Trinitarios leadership", alias:"Los Trinitarios", organization:"Los Trinitarios", role:"National gang network", status:"active", threat_level:"critical", territories:["Santo Domingo Norte","Los Alcarrizos"], coordinates:[18.5601,-69.9440], country:"DO", sanctions:["US Treasury OFAC (NYC wing)"], description:"Largest gang in DR. Founded in NY prisons, now dominates Santo Domingo periphery.", sources:["insightcrime.org"] },
+        ]
+      }
+    },
+    live_streams: [
+      { name:"Radio Télé Ginen", country:"HT", type:"youtube_live", url:"https://www.youtube.com/@RadioTeleGinen/live", language:"HT/FR", description:"Popular independent Haitian network" },
+      { name:"TNH — Télévision Nationale d'Haïti", country:"HT", type:"youtube_live", url:"https://www.youtube.com/@TNH/live", language:"FR/HT", description:"Official Haitian state TV" },
+      { name:"CDN 37 Dominican", country:"DO", type:"youtube_live", url:"https://www.youtube.com/@CDN37/live", language:"ES", description:"Dominican news channel" },
+    ],
+    map_data: {
+      gang_territories: [
+        { name:"Barbecue / G9", organization:"Viv Ansanm", lat:18.5792, lng:-72.3288, threat_level:"critical", country:"HT", type:"gang_presence" },
+        { name:"Izo / 5 Segonn", organization:"Viv Ansanm", lat:18.5680, lng:-72.3378, threat_level:"critical", country:"HT", type:"gang_presence" },
+        { name:"Ti Gabriel / Gran Grif", organization:"Gran Grif", lat:18.5889, lng:-72.2700, threat_level:"critical", country:"HT", type:"gang_presence" },
+        { name:"Vitelhomme / Kraze Baryè", organization:"Kraze Baryè", lat:18.5520, lng:-72.3289, threat_level:"high", country:"HT", type:"gang_presence" },
+        { name:"400 Mawozo", organization:"400 Mawozo", lat:18.5780, lng:-72.1970, threat_level:"high", country:"HT", type:"gang_presence" },
+        { name:"Chandèl / Krisla", organization:"Chandèl", lat:19.1500, lng:-72.5700, threat_level:"high", country:"HT", type:"gang_presence" },
+        { name:"Los Trinitarios", organization:"Los Trinitarios", lat:18.5601, lng:-69.9440, threat_level:"critical", country:"DO", type:"criminal_network" },
+      ],
+      crisis_points: [
+        { location:"Port-au-Prince", lat:18.5432, lng:-72.3395, article_count:12, latest_headline:"Security situation deteriorates in capital", country:"HT" },
+        { location:"Cap-Haïtien", lat:19.7575, lng:-72.2083, article_count:4, latest_headline:"Northern Haiti humanitarian update", country:"HT" },
+        { location:"Artibonite", lat:19.2000, lng:-72.7000, article_count:6, latest_headline:"Gang violence disrupts farming in Artibonite Valley", country:"HT" },
+      ],
+      border_crossings: [
+        { name:"Dajabón / Ouanaminthe", lat:19.5558, lng:-71.7054, status:"monitored" },
+        { name:"Jimaní / Malpasse", lat:18.4956, lng:-71.8497, status:"monitored" },
+        { name:"Elías Piña / Belladère", lat:18.8839, lng:-71.6917, status:"monitored" },
+        { name:"Pedernales / Anse-à-Pitres", lat:18.0377, lng:-71.7456, status:"limited" },
+      ],
+      key_infrastructure: [
+        { name:"Port PaP", lat:18.5489, lng:-72.3430, type:"port", country:"HT" },
+        { name:"Toussaint Louverture Intl", lat:18.5799, lng:-72.2925, type:"airport", country:"HT" },
+        { name:"ENCO Varreux Fuel Terminal", lat:18.5605, lng:-72.3320, type:"fuel_terminal", country:"HT" },
+        { name:"Peligre Dam", lat:19.0131, lng:-72.0328, type:"hydro_dam", country:"HT" },
+        { name:"Port Caucedo DR", lat:18.4069, lng:-69.6264, type:"port", country:"DO" },
+        { name:"Las Américas Intl (SDQ)", lat:18.4297, lng:-69.6688, type:"airport", country:"DO" },
+      ]
+    }
+  };
+  renderAll();
+  document.getElementById('loading-overlay').style.display = 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RENDER ALL
+// ─────────────────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderHeader();
+  renderExecSummary();
+  renderNews();
+  renderBriefs();
+  renderStreams();
+  renderCII();
+  renderFinance();
+  renderCriminals();
+  initGlobe();
+}
+
+function renderHeader() {
+  const meta = FEED.meta;
+  document.getElementById('article-count').textContent = `${meta.total_articles} articles`;
+  const d = new Date(meta.generated_at);
+  document.getElementById('last-update').textContent = `Updated ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+  document.getElementById('timestamp').textContent = `Feed generated: ${d.toLocaleString()} UTC • Next update in ~6h`;
+}
+
+// ─── EXECUTIVE SUMMARY ────────────────────────────────────────────────────────
+function renderExecSummary() {
+  document.getElementById('exec-text').textContent = FEED.executive_summary;
+}
+
+// ─── NEWS ─────────────────────────────────────────────────────────────────────
+const CAT_COLORS = {
+  security: '#ff2222', politics: '#ff6600', economy: '#ffaa00', disaster: '#ff4400',
+  crime: '#cc00cc', health: '#00ccaa', migration: '#0088ff', diplomacy: '#4488ff',
+  finance: '#00cc66', infrastructure: '#88ff00', environment: '#00ff88',
+  culture: '#aa66ff', sports: '#ff88aa', diaspora: '#ffcc00', default: '#4488ff'
+};
+
+function renderNews() {
+  const articles = FEED.articles.filter(a => newsFilter === 'all' || a.country === newsFilter);
+  const container = document.getElementById('news-list');
+  if (!articles.length) {
+    container.innerHTML = '<div style="padding:20px;color:var(--text3);text-align:center;">No articles loaded yet.<br>Run the pipeline to populate.</div>';
+    return;
+  }
+  container.innerHTML = articles.slice(0, 80).map(a => {
+    const color = CAT_COLORS[a.category] || CAT_COLORS.default;
+    const cFlag = a.country === 'HT' ? '🇭🇹' : a.country === 'DO' ? '🇩🇴' : '🌐';
+    const ago = timeAgo(a.published);
+    return `<div class="news-article" onclick="window.open('${a.url}','_blank')">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+        <span class="news-cat" style="background:${color}22;color:${color};border:1px solid ${color}44;">${a.category}</span>
+        <span style="font-size:9px;">${cFlag}</span>
+      </div>
+      <div class="news-title">${escapeHtml(a.title)}</div>
+      <div class="news-meta">${escapeHtml(a.source)} · ${ago} · T${a.tier}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── BRIEFS ───────────────────────────────────────────────────────────────────
+function renderBriefs() {
+  const briefs = FEED.category_briefs || {};
+  document.getElementById('briefs-list').innerHTML = Object.entries(briefs)
+    .filter(([, v]) => v && v.length > 10)
+    .map(([cat, text]) => {
+      const color = CAT_COLORS[cat] || CAT_COLORS.default;
+      return `<div class="brief-card">
+        <div class="brief-cat" style="color:${color};">${cat}</div>
+        <div class="brief-text">${escapeHtml(text)}</div>
+      </div>`;
+    }).join('');
+}
+
+// ─── STREAMS ──────────────────────────────────────────────────────────────────
+function renderStreams() {
+  const streams = FEED.live_streams || [];
+  document.getElementById('streams-list').innerHTML = streams.map((s, i) => {
+    const flag = s.country === 'HT' ? '🇭🇹' : s.country === 'DO' ? '🇩🇴' : '🌐';
+    return `<div class="stream-card">
+      <div class="stream-name">${flag} ${escapeHtml(s.name)}</div>
+      <div class="stream-meta">${escapeHtml(s.language)} · ${escapeHtml(s.description)}</div>
+      <button class="stream-btn" onclick="openStream('${escapeHtml(s.url)}', ${i})">▶ OPEN STREAM</button>
+      <div id="stream-embed-${i}"></div>
+    </div>`;
+  }).join('');
+}
+
+function openStream(url, i) {
+  window.open(url, '_blank');
+}
+
+// ─── CII ──────────────────────────────────────────────────────────────────────
+const SIGNAL_LABELS = {
+  gang_security: 'Gang/Security', political_stability: 'Politics',
+  economic_distress: 'Economy', fuel_scarcity: 'Fuel',
+  displacement_idp: 'Displacement', disease_health: 'Health',
+  natural_disaster: 'Nat. Disaster', border_tension: 'Border',
+  diaspora_remittance: 'Remittances', media_freedom: 'Press Freedom',
+  international_presence: 'Intl. Presence', social_unrest_velocity: 'Unrest'
+};
+
+function riskColor(score) {
+  if (score >= 70) return 'var(--critical)';
+  if (score >= 50) return 'var(--high)';
+  if (score >= 30) return 'var(--medium)';
+  return 'var(--low)';
+}
+
+function renderCII() {
+  const cii = FEED.cii || {};
+  const countries = [
+    { code: 'HT', label: '🇭🇹 HAITI', data: cii.HT },
+    { code: 'DO', label: '🇩🇴 DOMINICAN REPUBLIC', data: cii.DO },
+  ];
+  
+  document.getElementById('cii-container').innerHTML = countries.map(({ label, data }) => {
+    if (!data) return '';
+    const color = riskColor(data.composite_score);
+    const signals = data.signals || {};
+    
+    const signalRows = Object.entries(signals).map(([key, val]) => {
+      const sc = riskColor(val);
+      return `<div class="cii-signal">
+        <span style="color:var(--text2);">${SIGNAL_LABELS[key] || key}</span>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span style="color:${sc};">${Math.round(val)}</span>
+          <div class="signal-dot" style="background:${sc};"></div>
+        </div>
+      </div>`;
+    }).join('');
+    
+    const trendArrow = data.trend === 'deteriorating' ? '↑' : data.trend === 'improving' ? '↓' : '→';
+    const trendColor = data.trend === 'deteriorating' ? 'var(--critical)' : data.trend === 'improving' ? 'var(--low)' : 'var(--medium)';
+    
+    return `<div class="cii-country">
+      <div class="cii-header">
+        <div>
+          <div style="color:var(--text3);font-size:9px;letter-spacing:1px;">${label}</div>
+          <div style="color:var(--text2);font-size:9px;margin-top:2px;">
+            <span style="color:${trendColor};">${trendArrow} ${data.trend.toUpperCase()}</span> · 
+            <span style="color:${color};">${data.risk_level.toUpperCase()} RISK</span>
+          </div>
+        </div>
+        <div class="cii-score" style="color:${color};">${data.composite_score.toFixed(1)}</div>
+      </div>
+      <div class="cii-bar-wrap">
+        <div class="cii-bar" style="width:${data.composite_score}%;background:${color};"></div>
+      </div>
+      <div class="cii-signals">${signalRows}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── FINANCE ──────────────────────────────────────────────────────────────────
+function renderFinance() {
+  const fin = FEED.finance || {};
+  const rates = fin.exchange_rates || {};
+  const commodities = fin.commodities || [];
+  const composite = fin.market_composite || {};
+  const companies = (fin.companies || []).slice(0, 12);
+  
+  const compositeColor = composite.composite_score >= 65 ? 'var(--critical)' :
+    composite.composite_score >= 40 ? 'var(--medium)' : 'var(--low)';
+  
+  document.getElementById('finance-container').innerHTML = `
+    <div class="section-header" style="position:relative;top:0;">EXCHANGE RATES</div>
+    <div class="finance-rate">
+      <div><div class="rate-label">USD / Gourde (HTG)</div><div style="color:var(--text3);font-size:9px;">Haiti</div></div>
+      <div class="rate-value">${rates.USD_HTG || 'N/A'}</div>
+    </div>
+    <div class="finance-rate">
+      <div><div class="rate-label">USD / Peso (DOP)</div><div style="color:var(--text3);font-size:9px;">Dominican Republic</div></div>
+      <div class="rate-value">${rates.USD_DOP || 'N/A'}</div>
+    </div>
+    
+    <div class="section-header" style="position:relative;top:0;margin-top:0;">MARKET STRESS COMPOSITE</div>
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="color:var(--text2);font-size:9px;">7-SIGNAL INDEX</span>
+        <span style="color:${compositeColor};font-size:16px;font-weight:bold;">${composite.composite_score || 'N/A'}</span>
+      </div>
+      <div class="market-bar-bg">
+        <div class="market-bar" style="width:${composite.composite_score || 0}%;background:${compositeColor};"></div>
+      </div>
+      <div style="color:var(--text3);font-size:9px;">${(composite.interpretation || '').toUpperCase()}</div>
+    </div>
+    
+    <div class="section-header" style="position:relative;top:0;margin-top:0;">COMMODITIES</div>
+    ${commodities.map(c => {
+      const cp = c.change_pct;
+      const chg = cp != null ? `<span class="${cp >= 0 ? 'change-pos' : 'change-neg'}">${cp >= 0 ? '+' : ''}${cp.toFixed(2)}%</span>` : '';
+      return `<div class="commodity-row">
+        <div>
+          <div class="commodity-name">${escapeHtml(c.name)}</div>
+          <div style="color:var(--text3);font-size:9px;">${escapeHtml(c.relevance)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="commodity-price">${c.price != null ? c.price.toLocaleString() : 'N/A'} <span style="font-size:8px;color:var(--text3);">${c.unit}</span></div>
+          <div style="font-size:9px;">${chg}</div>
+        </div>
+      </div>`;
+    }).join('')}
+    
+    <div class="section-header" style="position:relative;top:0;margin-top:0;">KEY COMPANIES (HT/DO)</div>
+    ${companies.map(c => `<div style="padding:6px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;">
+      <div>
+        <div style="color:var(--text);font-size:10px;">${escapeHtml(c.name)}</div>
+        <div style="color:var(--text3);font-size:9px;">${escapeHtml(c.sector)}</div>
+      </div>
+      <div style="font-size:9px;color:var(--text2);">${c.country === 'HT' ? '🇭🇹' : '🇩🇴'}</div>
+    </div>`).join('')}
+  `;
+}
+
+// ─── CRIMINALS ────────────────────────────────────────────────────────────────
+function renderCriminals() {
+  const ci = FEED.criminal_intelligence || {};
+  const ht = (ci.haiti || {}).criminals || [];
+  const dr = (ci.dominican_republic || {}).criminals || [];
+  
+  const renderCard = (c) => {
+    const sc = `threat-${c.threat_level}`;
+    const statusColor = c.status === 'active' ? 'var(--critical)' : c.status === 'arrested' ? 'var(--low)' : 'var(--medium)';
+    return `<div class="criminal-card" onclick="flyToCoords(${c.coordinates[0]}, ${c.coordinates[1]})">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="criminal-rank">#${c.rank} · <span style="color:${statusColor};font-size:9px;">${c.status.toUpperCase()}</span></div>
+        <span class="threat-badge ${sc}">${c.threat_level.toUpperCase()}</span>
+      </div>
+      <div class="criminal-name">${escapeHtml(c.alias || c.name)}</div>
+      <div class="criminal-org">${escapeHtml(c.organization)}</div>
+      <div class="criminal-desc">${escapeHtml(c.description.slice(0, 120))}${c.description.length > 120 ? '...' : ''}</div>
+      ${c.sanctions.length ? `<div style="color:var(--medium);font-size:8px;margin-top:4px;">⚠ ${c.sanctions[0]}</div>` : ''}
+      <div style="color:var(--text3);font-size:8px;margin-top:3px;">📍 ${c.territories.slice(0,2).join(' · ')}</div>
+    </div>`;
+  };
+  
+  document.getElementById('criminals-container').innerHTML = `
+    <div style="padding:6px 12px;background:rgba(255,34,34,0.1);border-bottom:1px solid var(--border);">
+      <span style="color:var(--critical);font-size:9px;letter-spacing:1px;">🇭🇹 HAITI — ${ht.length} TRACKED</span>
+    </div>
+    ${ht.map(renderCard).join('')}
+    <div style="padding:6px 12px;background:rgba(204,0,0,0.1);border-bottom:1px solid var(--border);margin-top:8px;">
+      <span style="color:#ff6666;font-size:9px;letter-spacing:1px;">🇩🇴 DOMINICAN REPUBLIC — ${dr.length} TRACKED</span>
+    </div>
+    ${dr.map(renderCard).join('')}
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GLOBE.GL
+// ─────────────────────────────────────────────────────────────────────────────
+function initGlobe() {
+  const container = document.getElementById('globe-container');
+  if (!container || typeof Globe === 'undefined') return;
+  
+  const mapData = FEED.map_data || {};
+  const gangPoints = layers.gangs ? (mapData.gang_territories || []) : [];
+  const crisisPoints = layers.crisis ? (mapData.crisis_points || []) : [];
+  const borderPoints = layers.border ? (mapData.border_crossings || []) : [];
+  const infraPoints = layers.infra ? (mapData.key_infrastructure || []) : [];
+  
+  // All points combined for globe
+  const allPoints = [
+    ...gangPoints.map(p => ({ ...p, _type: 'gang', lat: p.lat, lng: p.lng })),
+    ...crisisPoints.map(p => ({ ...p, _type: 'crisis' })),
+    ...borderPoints.map(p => ({ ...p, _type: 'border' })),
+    ...infraPoints.map(p => ({ ...p, _type: 'infra' })),
+  ];
+  
+  const pointColor = (p) => {
+    if (p._type === 'gang') return p.threat_level === 'critical' ? '#ff2222' : p.threat_level === 'high' ? '#ff6600' : '#ffaa00';
+    if (p._type === 'crisis') return '#ffaa00';
+    if (p._type === 'border') return '#00aaff';
+    if (p._type === 'infra') return '#44ff88';
+    return '#ffffff';
+  };
+  
+  const pointAltitude = (p) => {
+    if (p._type === 'gang' && p.threat_level === 'critical') return 0.08;
+    if (p._type === 'gang') return 0.04;
+    return 0.02;
+  };
+  
+  globe = Globe()(container)
+    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+    .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+    .backgroundColor('#080f1a')
+    .pointsData(allPoints)
+    .pointLat(p => p.lat)
+    .pointLng(p => p.lng)
+    .pointColor(pointColor)
+    .pointAltitude(pointAltitude)
+    .pointRadius(0.4)
+    .pointLabel(p => `
+      <div style="background:rgba(8,15,26,0.9);border:1px solid #1e3a5f;padding:8px;font-family:monospace;font-size:11px;max-width:200px;">
+        <strong style="color:#c8d8f0;">${p.name || p.location || ''}</strong>
+        ${p.organization ? `<br><span style="color:#7a9fc0;">${p.organization}</span>` : ''}
+        ${p.threat_level ? `<br><span style="color:${pointColor(p)};">${p.threat_level.toUpperCase()}</span>` : ''}
+        ${p.latest_headline ? `<br><span style="color:#7a9fc0;font-size:10px;">${p.latest_headline.slice(0,60)}...</span>` : ''}
+        ${p.type ? `<br><span style="color:#3d6080;font-size:9px;">${p.type}</span>` : ''}
+      </div>
+    `)
+    .pointsTransitionDuration(500);
+  
+  // Point to Hispaniola
+  globe.pointOfView({ lat: 19.0, lng: -72.5, altitude: 1.5 }, 1000);
+  
+  // Atmospheric glow
+  globe.atmosphereColor('#003366');
+  globe.atmosphereAltitude(0.15);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAP ENGINE SWITCHING
+// ─────────────────────────────────────────────────────────────────────────────
+function switchMap(engine) {
+  currentMapEngine = engine;
+  document.getElementById('btn-globe').classList.toggle('active', engine === 'globe');
+  document.getElementById('btn-flat').classList.toggle('active', engine === 'flat');
+  document.getElementById('globe-container').classList.toggle('hidden', engine !== 'globe');
+  document.getElementById('flat-map-container').classList.toggle('active', engine === 'flat');
+  
+  if (engine === 'flat' && !flatMap) {
+    initFlatMap();
+  }
+}
+
+function initFlatMap() {
+  if (typeof maplibregl === 'undefined') return;
+  
+  flatMap = new maplibregl.Map({
+    container: 'flat-map-container',
+    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    center: [-72.5, 19.0],
+    zoom: 6,
+  });
+  
+  flatMap.on('load', () => {
+    addDeckLayers();
+  });
+}
+
+function addDeckLayers() {
+  // Deck.gl ScatterplotLayer over MapLibre
+  if (typeof deck === 'undefined' || !FEED) return;
+  
+  const mapData = FEED.map_data || {};
+  const gangData = (mapData.gang_territories || []).map(p => ({
+    position: [p.lng, p.lat], name: p.name, org: p.organization,
+    threat: p.threat_level,
+    color: p.threat_level === 'critical' ? [255,34,34,200] : p.threat_level === 'high' ? [255,102,0,200] : [255,170,0,200],
+    radius: p.threat_level === 'critical' ? 4000 : 2000,
+  }));
+  
+  const crisisData = (mapData.crisis_points || []).map(p => ({
+    position: [p.lng, p.lat], name: p.location,
+    color: [255,170,0,150], radius: 3000,
+  }));
+  
+  const infraData = (mapData.key_infrastructure || []).map(p => ({
+    position: [p.lng, p.lat], name: p.name,
+    color: [68,255,136,180], radius: 1500,
+  }));
+  
+  const overlay = new deck.MapboxOverlay({
+    interleaved: false,
+    layers: [
+      new deck.ScatterplotLayer({
+        id: 'gangs',
+        data: gangData,
+        getPosition: d => d.position,
+        getFillColor: d => d.color,
+        getRadius: d => d.radius,
+        radiusUnits: 'meters',
+        pickable: true,
+      }),
+      new deck.ScatterplotLayer({
+        id: 'crisis',
+        data: crisisData,
+        getPosition: d => d.position,
+        getFillColor: d => d.color,
+        getRadius: d => d.radius,
+        radiusUnits: 'meters',
+        pickable: true,
+      }),
+      new deck.ScatterplotLayer({
+        id: 'infra',
+        data: infraData,
+        getPosition: d => d.position,
+        getFillColor: d => d.color,
+        getRadius: d => d.radius,
+        radiusUnits: 'meters',
+        pickable: true,
+      }),
+    ],
+  });
+  
+  flatMap.addControl(overlay);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAP NAVIGATION
+// ─────────────────────────────────────────────────────────────────────────────
+function resetView() {
+  if (currentMapEngine === 'globe' && globe) {
+    globe.pointOfView({ lat: 19.0, lng: -72.5, altitude: 1.5 }, 800);
+  } else if (flatMap) {
+    flatMap.flyTo({ center: [-72.5, 19.0], zoom: 6, duration: 800 });
+  }
+}
+
+function flyToHaiti() {
+  if (currentMapEngine === 'globe' && globe) {
+    globe.pointOfView({ lat: 18.9712, lng: -72.2852, altitude: 0.5 }, 1000);
+  } else if (flatMap) {
+    flatMap.flyTo({ center: [-72.3395, 18.5432], zoom: 8, duration: 1000 });
+  }
+}
+
+function flyToDR() {
+  if (currentMapEngine === 'globe' && globe) {
+    globe.pointOfView({ lat: 18.7357, lng: -70.1627, altitude: 0.5 }, 1000);
+  } else if (flatMap) {
+    flatMap.flyTo({ center: [-69.9312, 18.4861], zoom: 8, duration: 1000 });
+  }
+}
+
+function flyToCaribbean() {
+  if (currentMapEngine === 'globe' && globe) {
+    globe.pointOfView({ lat: 19.0, lng: -72.5, altitude: 1.8 }, 1000);
+  } else if (flatMap) {
+    flatMap.flyTo({ center: [-72.5, 19.0], zoom: 5, duration: 1000 });
+  }
+}
+
+function flyToCoords(lat, lng) {
+  if (currentMapEngine === 'globe' && globe) {
+    globe.pointOfView({ lat, lng, altitude: 0.4 }, 1200);
+  } else if (flatMap) {
+    flatMap.flyTo({ center: [lng, lat], zoom: 11, duration: 1200 });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYER TOGGLES
+// ─────────────────────────────────────────────────────────────────────────────
+function toggleLayer(name) {
+  layers[name] = !layers[name];
+  const el = document.getElementById(`layer-${name}`);
+  if (el) {
+    el.classList.toggle('checked', layers[name]);
+    el.classList.toggle('checked-red', layers[name] && name === 'gangs');
+  }
+  if (globe) {
+    globe.pointsData([]); // clear
+    initGlobe(); // re-render
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────────────────────────────────────────
+document.querySelectorAll('#left-tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const t = tab.dataset.tab;
+    document.querySelectorAll('#left-tabs .tab').forEach(x => x.classList.remove('active'));
+    tab.classList.add('active');
+    ['news','briefs','streams','subscribe'].forEach(id => {
+      document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== t);
+    });
+  });
+});
+
+document.querySelectorAll('#right-tabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const t = tab.dataset.tab;
+    document.querySelectorAll('#right-tabs .tab').forEach(x => x.classList.remove('active'));
+    tab.classList.add('active');
+    ['cii','finance','criminals'].forEach(id => {
+      document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== t);
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUBSCRIBE
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleSubscribe() {
+  const email = document.getElementById('subscribe-email').value.trim();
+  const status = document.getElementById('subscribe-status');
+  
+  if (!email || !email.includes('@')) {
+    status.style.color = 'var(--critical)';
+    status.textContent = '⚠ Enter a valid email address.';
+    return;
+  }
+  
+  status.style.color = 'var(--accent)';
+  status.textContent = 'Subscribing...';
+  
+  // In production, this would call a Cloudflare Worker / Vercel function
+  // For now, we link to a simple Resend form endpoint
+  try {
+    // You'd replace this with your actual subscribe endpoint
+    const res = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    
+    if (res.ok) {
+      status.style.color = 'var(--low)';
+      status.textContent = `✓ Subscribed! You'll receive briefs every Friday.`;
+      document.getElementById('subscribe-email').value = '';
+    } else {
+      throw new Error('Server error');
+    }
+  } catch(e) {
+    // Fallback: open mailto
+    status.style.color = 'var(--medium)';
+    status.textContent = 'Auto-subscribe not configured. Email hispaniola-monitor@example.com to subscribe manually.';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────────────────────────────
+function timeAgo(dateStr) {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = Math.floor((now - then) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return `${Math.floor(diff/86400)}d ago`;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+loadFeed();
+
+// Refresh every 30 minutes
+setInterval(loadFeed, 30 * 60 * 1000);
+</script>
+
+</body>
+</html>

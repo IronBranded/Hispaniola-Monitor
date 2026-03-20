@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "generated_at": "2026-03-20T12:00:00Z",
+    "version": "1.0",
+    "project": "hispaniola-monitor",
+    "total_articles": 0,
+    "total_feeds_scraped": 0,
+    "note": "This is a placeholder. The GitHub Actions pipeline will replace this every 6 hours."
+  },
+  "executive_summary": "Intelligence pipeline not yet run. Configure GROQ_API_KEY in GitHub Secrets, push the repository, and the pipeline will auto-execute and populate this file with synthesized intelligence from 435+ sources every 6 hours.",
+  "category_briefs": {},
+  "articles": [],
+  "cii": {
+    "HT": {
+      "country": "HT",
+      "composite_score": 74.2,
+      "risk_level": "critical",
+      "trend": "deteriorating",
+      "signals": {
+        "gang_security": 87,
+        "political_stability": 71,
+        "economic_distress": 78,
+        "fuel_scarcity": 70,
+        "displacement_idp": 75,
+        "disease_health": 60,
+        "natural_disaster": 55,
+        "border_tension": 55,
+        "diaspora_remittance": 30,
+        "media_freedom": 55,
+        "international_presence": 35,
+        "social_unrest_velocity": 68
+      },
+      "signal_article_counts": {},
+      "computed_at": "2026-03-20T12:00:00Z"
+    },
+    "DO": {
+      "country": "DO",
+      "composite_score": 28.5,
+      "risk_level": "low",
+      "trend": "stable",
+      "signals": {
+        "gang_security": 30,
+        "political_stability": 25,
+        "economic_distress": 28,
+        "fuel_scarcity": 20,
+        "displacement_idp": 15,
+        "disease_health": 20,
+        "natural_disaster": 35,
+        "border_tension": 45,
+        "diaspora_remittance": 20,
+        "media_freedom": 30,
+        "international_presence": 15,
+        "social_unrest_velocity": 25
+      },
+      "signal_article_counts": {},
+      "computed_at": "2026-03-20T12:00:00Z"
+    }
+  },
+  "finance": {
+    "exchange_rates": {
+      "USD_HTG": 132.5,
+      "USD_DOP": 59.3,
+      "source": "placeholder"
+    },
+    "commodities": [],
+    "companies": [],
+    "market_composite": {
+      "composite_score": 58,
+      "signals": [],
+      "interpretation": "moderate"
+    }
+  },
+  "criminal_intelligence": {
+    "haiti": { "total_tracked": 0, "active": 0, "criminals": [] },
+    "dominican_republic": { "total_tracked": 0, "active": 0, "criminals": [] }
+  },
+  "live_streams": [
+    {
+      "name": "Radio Télé Ginen",
+      "country": "HT",
+      "type": "youtube_live",
+      "url": "https://www.youtube.com/@RadioTeleGinen/live",
+      "embed_id": null,
+      "language": "HT/FR",
+      "description": "Popular independent Haitian radio and TV network"
+    },
+    {
+      "name": "TNH — Télévision Nationale d'Haïti",
+      "country": "HT",
+      "type": "youtube_live",
+      "url": "https://www.youtube.com/@TNH/live",
+      "embed_id": null,
+      "language": "FR/HT",
+      "description": "Official Haitian state television"
+    },
+    {
+      "name": "CDN 37 — Dominicana",
+      "country": "DO",
+      "type": "youtube_live",
+      "url": "https://www.youtube.com/@CDN37/live",
+      "embed_id": null,
+      "language": "ES",
+      "description": "Dominican Republic news channel"
+    }
+  ],
+  "map_data": {
+    "gang_territories": [],
+    "crisis_points": [],
+    "border_crossings": [
+      {"name": "Dajabón / Ouanaminthe", "lat": 19.5558, "lng": -71.7054, "status": "monitored"},
+      {"name": "Jimaní / Malpasse", "lat": 18.4956, "lng": -71.8497, "status": "monitored"},
+      {"name": "Elías Piña / Belladère", "lat": 18.8839, "lng": -71.6917, "status": "monitored"},
+      {"name": "Pedernales / Anse-à-Pitres", "lat": 18.0377, "lng": -71.7456, "status": "limited"}
+    ],
+    "key_infrastructure": []
+  }
+}
